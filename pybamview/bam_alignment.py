@@ -70,7 +70,7 @@ def GetDefaultLocation(bamfiles):
             continue
         # Peak at the first read
         try:
-            aligned_read = br.next()
+            aligned_read = next(br)
         except StopIteration:
             continue
         if not aligned_read.is_unmapped:
@@ -143,7 +143,7 @@ class AlignmentGrid(object):
         # Keep track of shortened chromosome names fasta entry has longer chrom string
         # e.g. "1 dna:chromosome" -> "1"
         if self.ref:
-            self.refkeys = dict([(key.split()[0], key) for key in self.ref.keys()])
+            self.refkeys = dict([(key.split()[0], key) for key in list(self.ref.keys())])
         else: self.refkeys = {}
         self.chrom = _chrom
         self.startpos = _pos
@@ -151,7 +151,7 @@ class AlignmentGrid(object):
         self.pos = self.startpos-int(self.settings["LOADCHAR"]*0.5)
         if self.pos < 0: self.pos = 0
         self.samples = list(set(
-            chain.from_iterable(rg.itervalues() for rg in _read_groups)))
+            chain.from_iterable(iter(list(rg.values())) for rg in _read_groups)))
         for item in _samples:
             if item not in self.samples: sys.stderr.write("WARNING: %s not in BAM\n"%item)
         if len(_samples) > 0:
@@ -170,14 +170,14 @@ class AlignmentGrid(object):
         """
         Return list of sample hashes
         """
-        return map(HashSample, self.samples)
+        return list(map(HashSample, self.samples))
 
     def LoadGrid(self):
         """
         Load grid of alignments with buffer around start pos
         """
         # Get reference
-        if self.ref is None or self.refkeys.get(self.chrom,"") not in self.ref.keys():
+        if self.ref is None or self.refkeys.get(self.chrom,"") not in list(self.ref.keys()):
             reference = ["N"]*self.settings["LOADCHAR"]
         else:
             refchrom = self.refkeys[self.chrom]
@@ -188,7 +188,7 @@ class AlignmentGrid(object):
                 reference = self.ref[refchrom][self.pos:]
             else: reference = self.ref[refchrom][self.pos:self.pos+self.settings["LOADCHAR"]]
             reference = [reference[i] for i in range(len(reference))]
-        griddict = {"position": range(self.pos, self.pos+len(reference)), "reference": reference}
+        griddict = {"position": list(range(self.pos, self.pos+len(reference))), "reference": reference}
         # Get reads
         region=str("%s:%s-%s"%(self.chrom, max(1, int(self.pos)), int(self.pos+self.settings["LOADCHAR"])))
         aligned_reads = []
@@ -238,7 +238,7 @@ class AlignmentGrid(object):
             griddict["aln%s"%readindex] = rep
             readindex += 1
         # Fix insertions
-        alnkeys = [item for item in griddict.keys() if item != "position"]
+        alnkeys = [item for item in list(griddict.keys()) if item != "position"]
         for i in insertion_locations:
             maxchars = insertion_locations[i]
             for ak in alnkeys:
@@ -260,7 +260,7 @@ class AlignmentGrid(object):
             sample_dict = dict([(x, griddict[x]) for x in alnkeys+["position","reference"]])
             # Read stacking
             sample_dict_collapsed = self.CollapseGridByPosition(sample_dict, alnkeys, maxreadlength=maxreadlength)
-            self.alnkeys_by_sample[sample] = [item for item in alnkeys if item in sample_dict_collapsed.keys()]
+            self.alnkeys_by_sample[sample] = [item for item in alnkeys if item in list(sample_dict_collapsed.keys())]
             self.grid_by_sample[sample] = sample_dict_collapsed
 
     def MergeRows(self, row1, row2, start, end):
@@ -314,8 +314,8 @@ class AlignmentGrid(object):
         """
         Return string for the reference track
         """
-        if len(self.grid_by_sample.keys()) == 0: return "N"*self.settings["LOADCHAR"]
-        refseries = self.grid_by_sample.values()[0]["reference"]
+        if len(list(self.grid_by_sample.keys())) == 0: return "N"*self.settings["LOADCHAR"]
+        refseries = list(self.grid_by_sample.values())[0]["reference"]
         reference = ""
         for i in range(len(refseries)):
             reference = reference + refseries[i]
@@ -323,8 +323,8 @@ class AlignmentGrid(object):
 
     def GetPositions(self, _pos):
         positions = []
-        if len(self.grid_by_sample.keys()) == 0: return range(self.pos, self.pos+self.settings["LOADCHAR"])
-        refseries = self.grid_by_sample.values()[0]["reference"]
+        if len(list(self.grid_by_sample.keys())) == 0: return list(range(self.pos, self.pos+self.settings["LOADCHAR"]))
+        refseries = list(self.grid_by_sample.values())[0]["reference"]
         for i in range(len(refseries)):
             positions.extend([self.pos+i]*len(refseries[i]))
         return positions
